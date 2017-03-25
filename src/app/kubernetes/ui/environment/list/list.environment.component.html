@@ -3,24 +3,25 @@
   <fabric8-loading [loading]="loading">
     <div id="environments" class="content container">
       <!--<alm-toolbar [config]="toolbarConfig" (onFilterChange)="filterChange($event)" (onSortChange)="sortChange($event)"></alm-toolbar>-->
-      <div class="environment" *ngFor="let environment of environments | async">
-        <h2>{{environment.name}}</h2>
+      <div class="environment" *ngFor="let e of environments | async">
+        <h2>{{e.environment.name}}</h2>
         <small>
-      OpenShift Project: {{environment.namespaceRef}}
+      OpenShift Project: {{e.environment.namespaceName}}
     </small>
 
-        <alm-tree-list #treeList [listTemplate]="treeListTemplate" [loadTemplate]="treeListLoadTemplate" [nodes]="nodes" [options]="options"
+        <alm-tree-list #treeList [listTemplate]="treeListTemplate" [loadTemplate]="treeListLoadTemplate" [nodes]="e.nodes" [options]="options"
           [showExpander]="false">
           <template #treeListLoadTemplate let-node="node" let-index="index">
             <span>Loading...</span>
           </template>
           <template #treeListTemplate let-node="node" let-index="index">
-            <div [ngSwitch]="node.parent?.data?.name?.toLowerCase()">
+            <div [ngSwitch]="node.parent?.data?.path?.toLowerCase()">
               <div *ngSwitchCase="'deployments'">
                 <alm-tree-list-item [node]="node" [template]="treeListItemTemplate">
                   <template #treeListItemTemplate>
                     <div class='list-group-item deployment'>
-                      <fabric8-deployment-list-entry [deployment]="node.data.deployment" class="deployments-list-entry"></fabric8-deployment-list-entry>
+                      here
+                      <!--<fabric8-deployment-list-entry [deployment]="node.data.deployment" class="deployments-list-entry"></fabric8-deployment-list-entry>-->
                     </div>
                   </template>
                 </alm-tree-list-item>

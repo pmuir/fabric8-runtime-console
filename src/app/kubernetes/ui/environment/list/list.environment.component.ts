@@ -1,7 +1,11 @@
+import { ServiceService } from './../../../service/service.service';
+import { Params } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
+import { SpaceStore } from './../../../store/space.store';
 import { Deployments } from './../../../model/deployment.model';
 import { Component, Input, ViewChild } from "@angular/core";
 
-import { Observable } from 'rxjs';
+import { Observable, ConnectableObservable } from 'rxjs';
 
 import {
   TreeNode,
@@ -13,31 +17,41 @@ import { ParentLinkFactory } from "../../../../common/parent-link-factory";
 import { CompositeDeploymentStore } from './../../../store/compositedeployment.store';
 import { ServiceStore } from './../../../store/service.store';
 import { createDeploymentViews } from '../../../view/deployment.view';
+import { ReplicaSetService } from './../../../service/replicaset.service';
+import { PodService } from './../../../service/pod.service';
+import { EventService } from './../../../service/event.service';
+import { ConfigMapService } from './../../../service/configmap.service';
+import { DeploymentConfigService } from './../../../service/deploymentconfig.service';
+import { DeploymentConfigs } from './../../../model/deploymentconfig.model';
+import { DeploymentService } from './../../../service/deployment.service';
+import { Space, Environment } from './../../../model/space.model';
 
-class Environment {
-  name: string;
-  type: EnvironmentType;
-  namespaceRef: string;
-  space: string;
-}
-
-class EnvironmentType {
-
-
-  public static readonly DEV = { name: 'dev' } as EnvironmentType;
-  public static readonly INT = { name: 'int' } as EnvironmentType;
-  public static readonly PROD = { name: 'prod' } as EnvironmentType;
-
-  name: string;
-
-  public static readonly MAPPED: Map<string, EnvironmentType> = new Map([
-    [EnvironmentType.DEV.name, EnvironmentType.DEV],
-    [EnvironmentType.INT.name, EnvironmentType.INT],
-    [EnvironmentType.PROD.name, EnvironmentType.PROD],
-  ]);
-
-}
-
+export let KINDS: any[] = [
+  {
+    name: "ConfigMap",
+    path: "configmaps",
+  },
+  {
+    name: "Deployments",
+    path: "deployments",
+  },
+  {
+    name: "Events",
+    path: "events",
+  },
+  {
+    name: "Pods",
+    path: "pods",
+  },
+  {
+    name: "ReplicaSets",
+    path: "replicasets",
+  },
+  {
+    name: "Services",
+    path: "services",
+  },
+];
 
 @Component({
   selector: 'fabric8-environments-list',
@@ -46,31 +60,6 @@ class EnvironmentType {
 })
 export class EnvironmentListComponent {
 
-  environments: Observable<Environment[]>;
-
-  nodes: any[] = [
-    {
-      name: 'ConfigMap',
-      hasChildren: true
-    },
-    {
-      name: 'Deployments',
-      hasChildren: true
-    },
-    {
-      name: 'Events',
-      hasChildren: true
-    }, {
-      name: 'Pods',
-      hasChildren: true
-    }, {
-      name: 'Replica Sets',
-      hasChildren: true
-    }, {
-      name: 'Services',
-      hasChildren: true
-    }
-  ];
   // See: https://angular2-tree.readme.io/docs/options
   options = {
     actionMapping: {
@@ -89,41 +78,110 @@ export class EnvironmentListComponent {
 
   @Input() loading: boolean;
 
+  environments: Observable<{ environment: Environment, nodes: { environment: Environment, name: string, path: string, hasChildren: boolean }[] }[]>;
+
+  space: ConnectableObservable<Space>;
+  data: Observable<Map<Environment, Map<string, any[]>>>;
+  environments1: Observable<Environment[]>;
+
   constructor(
     parentLinkFactory: ParentLinkFactory,
-    private deploymentsStore: CompositeDeploymentStore,
+    private spaceStore: SpaceStore,
+    route: ActivatedRoute,
+    private deploymentConfigService: DeploymentConfigService,
+    private configMapService: ConfigMapService,
+    private eventService: EventService,
+    private podService: PodService,
+    private replicaSetService: ReplicaSetService,
+    private serviceService: ServiceService
   ) {
     this.parentLink = parentLinkFactory.parentLink;
-    this.environments = Observable.of(['dev', 'int'].map(env => ({
-        name: `BalloonPopGame (${env.slice(0, 1).toLocaleUpperCase()}${env.slice(1, env.length)})`,
-        type: EnvironmentType.MAPPED.get(env),
-        namespaceRef: `rhn-support-pmuir-${env}`,
-        space: 'BalloonPopGame'
-      } as Environment)));
+    this.space = route.params.pluck<Params, string>('space')
+      .map((id) => spaceStore.load(id))
+      .switchMap(() => spaceStore.resource.distinctUntilChanged())
+      .skipWhile(space => !space)
+      .publish();
+    this.space.subscribe(space => console.log(space));
+    let kindPaths = Object.keys(KINDS).map(key => KINDS[key].path);
+    this.environments = this.space
+      .map(space => space.environments)
+      .map(environments => environments.map(environment => {
+        let e = {
+          environment: environment,
+          // Create the tree nodes for each environment
+          nodes: KINDS.map(kind => ({
+            environment: environment,
+            name: kind.name,
+            path: kind.path,
+            hasChildren: true,
+          })),
+        };
+        return e;
+      }));
+    this.data = this.space
+      .map(space => space.environments)
+      .switchMap(environments => {
+        let res = environments.map(environment => {
+          return kindPaths
+            .map(kind => {
+              return this.getList(kind, environment)
+                .distinctUntilChanged()
+                .map(obj => ({ environment: environment, obj: obj, kind: kind }));
+            });
+        });
+        let reduced = res.reduce((acc, val) => acc.concat(val), []);
+        return Observable.merge(...reduced);
+      })
+      .scan((res, wrapper) => {
+        if (!res.has(wrapper.environment)) {
+          res.set(wrapper.environment, new Map());
+        }
+        res.get(wrapper.environment).set(wrapper.kind, wrapper.obj);
+        return res;
+      }, new Map<Environment, any>());
 
+    this.data.subscribe(data => {
+      console.log(data);
+    });
+    this.environments.subscribe(environments => console.log(environments));
+    this.environments1 = Observable.of([]);
+    this.space.connect();
   }
 
-  private get deployments(): Observable<Deployments> {
-    return this.deploymentsStore.loadAll();
+  getChildren(node: TreeNode) {
+    return new Promise(resolve => {
+
+    });
+    return ;
   }
 
-getChildren(node: TreeNode) {
-  if (node.data.name === 'Deployments') {
-    return this.deployments
-      .map(deployments => deployments.map(deployment => ({
-        name: deployment.name,
-        deployment: deployment,
-        hasChildren: false
-      })))
-      .do(val => console.log('children:', val)).first()
-      .toPromise();
-  } else {
-    return Observable.of({}).toPromise();
+  childrenCount(node: TreeNode): string {
+    return node && node.children ? `(${node.children.length})` : '';
   }
-}
 
-childrenCount(node: TreeNode): string {
-  return node && node.children ? `(${node.children.length})` : '';
-}
+  inspect(data: any) {
+    console.log('inspecting', data);
+    return data;
+  }
+
+  private getList(kind: string, environment: Environment): Observable<any[]> {
+    let namespace = environment.namespace.name;
+    switch (kind) {
+      case 'deployments':
+        return this.deploymentConfigService.list(namespace);
+      case 'configmaps':
+        return this.configMapService.list(namespace);
+      case 'events':
+        return this.eventService.list(namespace);
+      case 'pods':
+        return this.podService.list(namespace);
+      case 'replicasets':
+        return this.replicaSetService.list(namespace);
+      case 'services':
+        return this.serviceService.list(namespace);
+      default:
+        return Observable.empty();
+    }
+  }
 
 }
