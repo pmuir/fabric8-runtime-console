@@ -9,13 +9,13 @@
       OpenShift Project: {{e.environment.namespaceName}}
     </small>
 
-        <alm-tree-list #treeList [listTemplate]="treeListTemplate" [loadTemplate]="treeListLoadTemplate" [nodes]="e.nodes" [options]="options"
+        <alm-tree-list #treeList [listTemplate]="treeListTemplate" [loadTemplate]="treeListLoadTemplate" [nodes]="e.kinds" [options]="options"
           [showExpander]="false">
           <template #treeListLoadTemplate let-node="node" let-index="index">
             <span>Loading...</span>
           </template>
           <template #treeListTemplate let-node="node" let-index="index">
-            <div [ngSwitch]="node.parent?.data?.path?.toLowerCase()">
+            <div [ngSwitch]="node.parent?.data?.kind?.path?.toLowerCase()">
               <div *ngSwitchCase="'deployments'">
                 <alm-tree-list-item [node]="node" [template]="treeListItemTemplate">
                   <template #treeListItemTemplate>
@@ -29,8 +29,8 @@
               <div *ngSwitchDefault>
                 <alm-tree-list-item [node]="node" [template]="treeListItemTemplate">
                   <template #treeListItemTemplate>
-                    <span title="{{node.data.subTitle}}">{{ node.data.name }}</span>
-                    <span>&nbsp;{{ childrenCount(node) }}</span>
+                    <span title="{{node.data.subTitle}}">{{ node.data.kind.name }}</span>
+                    <span>&nbsp;{{ TODO }}</span>
                   </template>
                 </alm-tree-list-item>
               </div>

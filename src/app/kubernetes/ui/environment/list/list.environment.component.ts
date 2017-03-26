@@ -26,7 +26,7 @@ import { DeploymentConfigs } from './../../../model/deploymentconfig.model';
 import { DeploymentService } from './../../../service/deployment.service';
 import { Space, Environment } from './../../../model/space.model';
 
-export let KINDS: any[] = [
+export let KINDS: Kind[] = [
   {
     name: "ConfigMap",
     path: "configmaps",
@@ -53,6 +53,26 @@ export let KINDS: any[] = [
   },
 ];
 
+class EnvironmentEntry {
+  environment: Environment;
+  kinds: KindNode[];
+}
+
+class Kind {
+  name: string;
+  path: string;
+}
+
+class KindNode {
+  environment: Environment;
+  kind: Kind;
+  children: [
+    {
+      data: Observable<any[]>,
+    }
+  ];
+}
+
 @Component({
   selector: 'fabric8-environments-list',
   templateUrl: './list.environment.component.html',
@@ -66,23 +86,21 @@ export class EnvironmentListComponent {
       mouse: {
         click: (tree, node, $event) => {
           TREE_ACTIONS.TOGGLE_EXPANDED(tree, node, $event);
-        }
-      }
+        },
+      },
     },
     allowDrag: false,
     isExpandedField: 'expanded',
-    getChildren: this.getChildren.bind(this)
   };
 
   parentLink: string;
 
   @Input() loading: boolean;
 
-  environments: Observable<{ environment: Environment, nodes: { environment: Environment, name: string, path: string, hasChildren: boolean }[] }[]>;
+  //environments: Observable<{ environment: Environment, nodes: { environment: Environment, name: string, path: string, hasChildren: boolean }[] }[]>;
 
+  environments: ConnectableObservable<EnvironmentEntry[]>;
   space: ConnectableObservable<Space>;
-  data: Observable<Map<Environment, Map<string, any[]>>>;
-  environments1: Observable<Environment[]>;
 
   constructor(
     parentLinkFactory: ParentLinkFactory,
@@ -105,58 +123,27 @@ export class EnvironmentListComponent {
     let kindPaths = Object.keys(KINDS).map(key => KINDS[key].path);
     this.environments = this.space
       .map(space => space.environments)
-      .map(environments => environments.map(environment => {
-        let e = {
+      .map(environments => environments.map(environment => ({
+        environment: environment,
+        kinds: KINDS.map(kind => ({
           environment: environment,
-          // Create the tree nodes for each environment
-          nodes: KINDS.map(kind => ({
-            environment: environment,
-            name: kind.name,
-            path: kind.path,
-            hasChildren: true,
-          })),
-        };
-        return e;
-      }));
-    this.data = this.space
-      .map(space => space.environments)
-      .switchMap(environments => {
-        let res = environments.map(environment => {
-          return kindPaths
-            .map(kind => {
-              return this.getList(kind, environment)
-                .distinctUntilChanged()
-                .map(obj => ({ environment: environment, obj: obj, kind: kind }));
-            });
-        });
-        let reduced = res.reduce((acc, val) => acc.concat(val), []);
-        return Observable.merge(...reduced);
-      })
-      .scan((res, wrapper) => {
-        if (!res.has(wrapper.environment)) {
-          res.set(wrapper.environment, new Map());
-        }
-        res.get(wrapper.environment).set(wrapper.kind, wrapper.obj);
-        return res;
-      }, new Map<Environment, any>());
+          kind: kind,
+          children: [
+            {
+              data: this.getList(kind.path, environment)
+                .distinctUntilChanged(),
+            },
+          ],
+        } as KindNode)),
+      }),
+      ))
+      .publish();
 
-    this.data.subscribe(data => {
-      console.log(data);
+    this.environments.subscribe(node => {
+      console.log(node);
     });
-    this.environments.subscribe(environments => console.log(environments));
-    this.environments1 = Observable.of([]);
+    this.environments.connect();
     this.space.connect();
-  }
-
-  getChildren(node: TreeNode) {
-    return new Promise(resolve => {
-
-    });
-    return ;
-  }
-
-  childrenCount(node: TreeNode): string {
-    return node && node.children ? `(${node.children.length})` : '';
   }
 
   inspect(data: any) {
