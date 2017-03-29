@@ -112,11 +112,24 @@ export class ContextService {
             }
           }
         }
+        if (!found && this.router.routerState.snapshot.root.firstChild) {
+            // routes that can't be correctly matched based on the url should use the parent path
+            for (let o of n.menus) {
+              o.active = false;
+              let parentPath = decodeURIComponent('/' + this.router.routerState.snapshot.root.firstChild.url.join('/'));
+              if (o.fullPath === parentPath) {
+                found = true;
+                o.active = true;
+                n.active = true;
+              }
+            }
+          }
         if (!found && n.fullPath === this.router.url) {
           n.active = true;
           found = true;
         }
       }
+
       if (!found) {
         for (let n of this.current.type.menus) {
           if (n.menus) {

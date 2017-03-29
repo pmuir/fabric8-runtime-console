@@ -1,23 +1,24 @@
-import {Context} from "./../models/context";
-import {ContextType} from "./../models/context-type";
-import {DevSpace} from "./../models/space";
-import {Resources} from "./../models/resources";
-import {ProcessTemplate} from "./../models/process-template";
-import {User} from "./../models/user";
-import {Team} from "./../models/team";
-import {Entity} from "./../models/entity";
-import {Injectable, OnInit} from "@angular/core";
+import { Context } from "./../models/context";
+import { ContextType } from "./../models/context-type";
+import { DevSpace } from "./../models/space";
+import { Resources } from "./../models/resources";
+import { ProcessTemplate } from "./../models/process-template";
+import { User } from "./../models/user";
+import { Team } from "./../models/team";
+import { Entity } from "./../models/entity";
+import { Injectable, OnInit } from "@angular/core";
 import "rxjs/add/operator/toPromise";
-import {Observable} from "rxjs";
-import {Spaces, Space, LabelSpace} from "../kubernetes/model/space.model";
-import {SpaceStore} from "../kubernetes/store/space.store";
-import {Router, NavigationEnd, ActivatedRoute, Params} from "@angular/router";
-import {BuildConfigStore} from "../kubernetes/store/buildconfig.store";
-import {BuildConfigs, BuildConfig} from "../kubernetes/model/buildconfig.model";
-import {MenuItem} from "../models/menu-item";
-import {resourceMenus} from "../kubernetes/components/resource-header/resource.header.component";
-import {pathJoin} from "../kubernetes/model/utils";
-import {Broadcaster} from 'ngx-base';
+import { Observable } from "rxjs";
+import { Spaces, Space, LabelSpace } from "../kubernetes/model/space.model";
+import { SpaceStore } from "../kubernetes/store/space.store";
+import { Router, NavigationEnd, ActivatedRoute, Params } from "@angular/router";
+import { BuildConfigStore } from "../kubernetes/store/buildconfig.store";
+import { BuildConfigs, BuildConfig } from "../kubernetes/model/buildconfig.model";
+import { MenuItem } from "../models/menu-item";
+import { resourceMenus } from "../kubernetes/components/resource-header/resource.header.component";
+import { pathJoin } from "../kubernetes/model/utils";
+import { Broadcaster } from 'ngx-base';
+import { trimEnd } from 'lodash';
 
 // A service responsible for providing dummy data for the UI prototypes.
 
@@ -67,19 +68,19 @@ export class DummyService implements OnInit {
           type: '',
         } as User,
       ], [
-      'qodfathr',
-      {
-        attributes: {
-          fullName: 'Todd Manicini',
-          imageURL: 'https://avatars1.githubusercontent.com/u/16322190?v=3&s=460',
-          email: 'tmancini@fabric8.io',
-          bio: 'I like writing clever one-line bios about myself. But, I can\'t!',
-          username: 'qodfathr',
-        },
-        id: '222',
-        type: '',
-      } as User,
-    ],
+        'qodfathr',
+        {
+          attributes: {
+            fullName: 'Todd Manicini',
+            imageURL: 'https://avatars1.githubusercontent.com/u/16322190?v=3&s=460',
+            email: 'tmancini@fabric8.io',
+            bio: 'I like writing clever one-line bios about myself. But, I can\'t!',
+            username: 'qodfathr',
+          },
+          id: '222',
+          type: '',
+        } as User,
+      ],
     ],
   );
 
@@ -401,10 +402,10 @@ export class DummyService implements OnInit {
   ]);
 
   readonly PROCESS_TEMPLATES: ProcessTemplate[] = [
-    {name: 'Agile'},
-    {name: 'Scrum'},
-    {name: 'Issue Tracking'},
-    {name: 'Scenario Driven Planning'},
+    { name: 'Agile' },
+    { name: 'Scrum' },
+    { name: 'Issue Tracking' },
+    { name: 'Scenario Driven Planning' },
   ];
   private _devSpaces: DevSpace[];
   private _currentContext: Context;
@@ -421,12 +422,12 @@ export class DummyService implements OnInit {
   private readonly params: Observable<Params>;
 
   constructor(//private http: Http,
-              //private localStorageService: LocalStorageService,
-              private broadcaster: Broadcaster,
-              private router: Router,
-              private activatedRoute: ActivatedRoute,
-              private spaceStore: SpaceStore,
-              private buildConfigStore: BuildConfigStore,) {
+    //private localStorageService: LocalStorageService,
+    private broadcaster: Broadcaster,
+    private router: Router,
+    private activatedRoute: ActivatedRoute,
+    private spaceStore: SpaceStore,
+    private buildConfigStore: BuildConfigStore, ) {
     this._defaultContexts = this.initDummy('contexts', this.CONTEXTS);
     this._devSpaces = this.initDummy('spaces', this.SPACES);
     this._contexts = this._defaultContexts;
@@ -496,7 +497,7 @@ export class DummyService implements OnInit {
         if (buildConfig) {
           this._currentContext = this.createBuildConfigContext(space, buildConfig);
         } else {
-            this._currentContext = this.createSpaceContext(space);
+          this._currentContext = this.createSpaceContext(space);
         }
       }
       this._contexts = this.createContextsFromBuildConfigs(space, buildConfigs);
@@ -595,6 +596,25 @@ export class DummyService implements OnInit {
               o.active = true;
               n.active = true;
               found = true;
+            }
+          }
+          if (!found && this.router.routerState.snapshot.root.firstChild) {
+            // routes that can't be correctly matched based on the url should use the parent path
+            for (let o of n.menus) {
+              o.active = false;
+              let parentPaths: string[] = [];
+              let child = this.router.routerState.snapshot.root.firstChild;
+              while (child.firstChild != null && child.firstChild.firstChild != null) {
+                let parentPath = (parentPaths.length > 0 ? parentPaths[parentPaths.length - 1] : '');
+                let childPath = child.url.join('/');
+                parentPaths.push(decodeURIComponent(parentPath + (childPath.length > 0 ? '/' + childPath : '')));
+                child = child.firstChild;
+              }
+              if (parentPaths.length > 0 && o.fullPath === parentPaths[parentPaths.length - 1]) {
+                found = true;
+                o.active = true;
+                n.active = true;
+              }
             }
           }
         }
@@ -766,22 +786,22 @@ export class DummyService implements OnInit {
          */
         {
           name: 'Create',
-          menus:appMenus,
+          menus: appMenus,
         },
-/*
-        {
-          name: 'Build',
-          path: buildPath,
-          /!*            menus: [
-           {
-           name: 'Pipelines',
-           path: '',
-           },
-           ],
-           *!/
-          menus: [],
-        },
-*/
+        /*
+                {
+                  name: 'Build',
+                  path: buildPath,
+                  /!*            menus: [
+                   {
+                   name: 'Pipelines',
+                   path: '',
+                   },
+                   ],
+                   *!/
+                  menus: [],
+                },
+        */
         {
           name: 'Run',
           path: runPath,
