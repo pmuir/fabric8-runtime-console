@@ -1,6 +1,7 @@
+import { Logger, Broadcaster } from 'ngx-base';
 import { TestAppModule } from './app.test.module';
 /* tslint:disable:no-unused-variable */
-import {TestBed, async} from "@angular/core/testing";
+import {TestBed, async, ComponentFixture} from "@angular/core/testing";
 import {RouterTestingModule} from "@angular/router/testing";
 import {AppComponent} from "./app.component";
 import {HeaderComponent} from "./header/header.component";
@@ -12,10 +13,13 @@ import {BrowserModule} from "@angular/platform-browser";
 import {HttpModule} from "@angular/http";
 import {KubernetesStoreModule} from "./kubernetes/kubernetes.store.module";
 import {RestangularModule} from "ng2-restangular";
-import { Broadcaster, Logger } from 'ngx-base';
 
 describe('AppComponent', () => {
-  beforeEach(() => {
+
+  let component: AppComponent;
+  let fixture: ComponentFixture<AppComponent>;
+
+  beforeEach(async(() => {
     TestBed.configureTestingModule({
       imports: [
         RouterTestingModule.withRoutes([]),
@@ -37,25 +41,25 @@ describe('AppComponent', () => {
           deps: [ConfigService],
           multi: true,
         },
-        Broadcaster,
         ContextService,
         DummyService,
         Logger,
       ],
-    });
-    TestBed.compileComponents();
+    }).compileComponents();
+  }));
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(AppComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
   });
 
   it('should create the app', async(() => {
-    let fixture = TestBed.createComponent(AppComponent);
-    let app = fixture.debugElement.componentInstance;
-    expect(app).toBeTruthy();
+    expect(component).toBeTruthy();
   }));
 
   it(`should have as title 'Fabric8 Console'`, async(() => {
-    let fixture = TestBed.createComponent(AppComponent);
-    let app = fixture.debugElement.componentInstance;
-    expect(app.title).toEqual('Fabric8 Console');
+    expect(component.title).toEqual('Fabric8 Console');
   }));
 
 });
